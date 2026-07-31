@@ -1,0 +1,8 @@
+{
+  "name": "Remix AIOStreams",
+  "description": "Netflix-style multi-cloud streaming app connecting Google Drive, MEGA, and TeraBox with link import, direct playback, and offline downloads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
