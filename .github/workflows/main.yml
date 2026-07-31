@@ -24,23 +24,55 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Fix AI Studio Project Structure
+    - name: Restructure AI Studio Project
       run: |
-        mkdir -p gradle
+        mkdir -p gradle app
+        
+        # Move version catalog to gradle directory
         if [ -f "libs.versions.toml" ]; then
           mv libs.versions.toml gradle/
         fi
 
-        if [ -f "settings.gradle.kts" ]; then
-          sed -i '/:app/d' settings.gradle.kts
+        # Move source code and resources to app directory
+        if [ -d "src" ]; then mv src app/; fi
+        if [ -f "proguard-rules.pro" ]; then mv proguard-rules.pro app/; fi
+        if [ -f "firebase-applet-config.json" ]; then mv firebase-applet-config.json app/; fi
+
+        # Move app build script to app/build.gradle.kts
+        if [ -f "build.gradle.kts" ]; then
+          mv build.gradle.kts app/build.gradle.kts
         fi
 
-        if [ -f "build.gradle.kts" ]; then
-          sed -i 's/signingConfig = signingConfigs.getByName("debugConfig")//g' build.gradle.kts
+        # Create empty root build.gradle.kts
+        touch build.gradle.kts
+
+        # Configure settings.gradle.kts with :app module
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        rootProject.name = "AIOStreams"
+        include(":app")
+        EOF
+
+        # Remove unsupported signing config line if present
+        if [ -f "app/build.gradle.kts" ]; then
+          sed -i 's/signingConfig = signingConfigs.getByName("debugConfig")//g' app/build.gradle.kts
         fi
 
     - name: Build Debug APK
-      run: gradle assembleDebug
+      run: gradle :app:assembleDebug
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
