@@ -24,51 +24,22 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Fix and Restructure AI Studio Project
+    - name: Prepare Google AI Studio Project
       run: |
-        # 1. Ensure .env file exists
+        # 1. Create .env file to prevent build script crash
         if [ -f ".env.example" ]; then
           cp .env.example .env
         else
           echo "GEMINI_API_KEY=dummy_key_for_ci_build" > .env
         fi
 
-        # 2. Create required directories
-        mkdir -p gradle app
-
-        # 3. Move version catalog to gradle/
+        # 2. Ensure version catalog is in gradle/ directory
+        mkdir -p gradle
         if [ -f "libs.versions.toml" ]; then
-          mv libs.versions.toml gradle/
+          cp libs.versions.toml gradle/
         fi
 
-        # 4. Move app source code & configuration files to app/
-        if [ -d "src" ]; then mv src app/; fi
-        if [ -f "proguard-rules.pro" ]; then mv proguard-rules.pro app/; fi
-        if [ -f "firebase-applet-config.json" ]; then mv firebase-applet-config.json app/; fi
-        cp .env app/.env
-
-        # 5. Move app build script to app/
-        if [ -f "build.gradle.kts" ]; then
-          mv build.gradle.kts app/build.gradle.kts
-        fi
-
-        # 6. Clean invalid debugConfig & fix plugin aliases in app/build.gradle.kts
-        if [ -f "app/build.gradle.kts" ]; then
-          sed -i '/signingConfig = signingConfigs.getByName("debugConfig")/d' app/build.gradle.kts
-          sed -i '/debugConfig/d' app/build.gradle.kts
-          
-          # Convert plugin aliases to standard plugin IDs to fix Kotlin DSL resolution
-          sed -i 's/alias(libs.plugins.android.application)/id("com.android.application")/g' app/build.gradle.kts
-          sed -i 's/alias(libs.plugins.kotlin.android)/id("org.jetbrains.kotlin.android")/g' app/build.gradle.kts
-          sed -i 's/alias(libs.plugins.kotlin.compose)/id("org.jetbrains.kotlin.plugin.compose")/g' app/build.gradle.kts
-        fi
-
-        # 7. Create root build.gradle.kts
-        cat << 'EOF' > build.gradle.kts
-        // Root build file
-        EOF
-
-        # 8. Create proper root settings.gradle.kts
+        # 3. Clean settings.gradle.kts for Single Root Project
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
@@ -85,11 +56,16 @@ jobs:
             }
         }
         rootProject.name = "RemixAIO-streams"
-        include(":app")
         EOF
 
+        # 4. Remove problematic signingConfig lines from build.gradle.kts
+        if [ -f "build.gradle.kts" ]; then
+          sed -i '/signingConfig/d' build.gradle.kts
+          sed -i '/debugConfig/d' build.gradle.kts
+        fi
+
     - name: Build Debug APK
-      run: gradle :app:assembleDebug
+      run: gradle assembleDebug
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
