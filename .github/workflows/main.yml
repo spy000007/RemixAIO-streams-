@@ -24,14 +24,15 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Restructure Project
+    - name: Fix AI Studio Project Files
       run: |
-        mkdir -p gradle app
+        mkdir -p gradle
         if [ -f "libs.versions.toml" ]; then
           mv libs.versions.toml gradle/
         fi
-        find . -maxdepth 1 -mindepth 1 ! -name '.git' ! -name '.github' ! -name 'gradle' ! -name 'settings.gradle.kts' ! -name 'app' -exec mv {} app/ \;
-        touch build.gradle.kts
+        if [ -f "settings.gradle.kts" ]; then
+          sed -i '/:app/d' settings.gradle.kts
+        fi
 
     - name: Build Debug APK
       run: gradle assembleDebug
