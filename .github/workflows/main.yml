@@ -24,29 +24,38 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Restructure AI Studio Project
+    - name: Fix and Restructure AI Studio Project
       run: |
+        # 1. Create .env file if missing
+        if [ -f ".env.example" ]; then
+          cp .env.example .env
+        else
+          echo "GEMINI_API_KEY=dummy_key_for_ci_build" > .env
+        fi
+
+        # 2. Setup directory structure
         mkdir -p gradle app
-        
-        # Move version catalog to gradle directory
+
+        # 3. Move version catalog
         if [ -f "libs.versions.toml" ]; then
           mv libs.versions.toml gradle/
         fi
 
-        # Move source code and resources to app directory
+        # 4. Move app code & configs to app/
         if [ -d "src" ]; then mv src app/; fi
         if [ -f "proguard-rules.pro" ]; then mv proguard-rules.pro app/; fi
         if [ -f "firebase-applet-config.json" ]; then mv firebase-applet-config.json app/; fi
+        if [ -f ".env" ]; then cp .env app/.env; fi
 
-        # Move app build script to app/build.gradle.kts
+        # 5. Move app build script
         if [ -f "build.gradle.kts" ]; then
           mv build.gradle.kts app/build.gradle.kts
         fi
 
-        # Create empty root build.gradle.kts
+        # 6. Create root build.gradle.kts
         touch build.gradle.kts
 
-        # Configure settings.gradle.kts with :app module
+        # 7. Write settings.gradle.kts
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
@@ -66,13 +75,14 @@ jobs:
         include(":app")
         EOF
 
-        # Remove unsupported signing config line if present
+        # 8. Clean app/build.gradle.kts of debugConfig line
         if [ -f "app/build.gradle.kts" ]; then
-          sed -i 's/signingConfig = signingConfigs.getByName("debugConfig")//g' app/build.gradle.kts
+          sed -i '/signingConfig = signingConfigs.getByName("debugConfig")/d' app/build.gradle.kts
+          sed -i '/debugConfig/d' app/build.gradle.kts
         fi
 
     - name: Build Debug APK
-      run: gradle :app:assembleDebug
+      run: gradle :app:assembleDebug --stacktrace
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
