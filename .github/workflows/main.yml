@@ -26,17 +26,17 @@ jobs:
 
     - name: Prepare Google AI Studio Project
       run: |
-        # 1. Create .env file to prevent build script crash
+        # 1. Create gradle directory and move version catalog completely
+        mkdir -p gradle
+        if [ -f "libs.versions.toml" ]; then
+          mv libs.versions.toml gradle/
+        fi
+
+        # 2. Setup .env file
         if [ -f ".env.example" ]; then
           cp .env.example .env
         else
           echo "GEMINI_API_KEY=dummy_key_for_ci_build" > .env
-        fi
-
-        # 2. Ensure version catalog is in gradle/ directory
-        mkdir -p gradle
-        if [ -f "libs.versions.toml" ]; then
-          cp libs.versions.toml gradle/
         fi
 
         # 3. Clean settings.gradle.kts for Single Root Project
@@ -58,14 +58,13 @@ jobs:
         rootProject.name = "RemixAIO-streams"
         EOF
 
-        # 4. Remove problematic signingConfig lines from build.gradle.kts
+        # 4. Remove debugConfig signing line as requested by AI Studio README
         if [ -f "build.gradle.kts" ]; then
-          sed -i '/signingConfig/d' build.gradle.kts
-          sed -i '/debugConfig/d' build.gradle.kts
+          sed -i 's/signingConfig = signingConfigs.getByName("debugConfig")//g' build.gradle.kts
         fi
 
     - name: Build Debug APK
-      run: gradle assembleDebug
+      run: gradle assembleDebug --stacktrace
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
