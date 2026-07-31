@@ -24,15 +24,37 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Fix AI Studio Project Files
+    - name: Fix AI Studio Single-Module Project
       run: |
         mkdir -p gradle
         if [ -f "libs.versions.toml" ]; then
           mv libs.versions.toml gradle/
         fi
-        if [ -f "settings.gradle.kts" ]; then
-          sed -i '/:app/d' settings.gradle.kts
-        fi
+        
+        cat << 'EOF' > settings.gradle.kts
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                google()
+                mavenCentral()
+            }
+            versionCatalogs {
+                create("libs") {
+                    from(files("gradle/libs.versions.toml"))
+                }
+            }
+        }
+        rootProject.name = "AIOStreams"
+        EOF
+
+        sed -i 's/signingConfig = signingConfigs.getByName("debugConfig")//g' build.gradle.kts || true
 
     - name: Build Debug APK
       run: gradle assembleDebug
